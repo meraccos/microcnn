@@ -52,7 +52,10 @@ class Value:
             for child in self.children:
                 child.zero_grad()
                 
-    def backward(self):
+    def backward(self, grad=None):
+        if grad:
+            self.grad = grad
+            
         if self.op == "+":
             self.children[0].grad += self.grad
             self.children[1].grad += self.grad

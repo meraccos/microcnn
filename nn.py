@@ -18,9 +18,8 @@ class Neuron:
             + f" b: {self.b.data:.3f}, act: {self.a.data:.3f}"
         )
 
-    def forward(self, inputs):
-        assert len(inputs) == self.input_dim, "Mismatched input dimensions"
-        self.z = sum(w * x for w, x in zip(self.w, inputs)) + self.b
+    def forward(self, X):
+        self.z = sum(w * x for w, x in zip(self.w, X)) + self.b
         self.a = self.act_fn.forward(self.z)
         return self.a
 
@@ -32,18 +31,32 @@ class Layer:
     def __init__(self, n_inputs, n_neurons, act_fn):
         self.neurons = [Neuron(n_inputs, act_fn) for i in range(n_neurons)]
 
-    def forward(self, inputs):
-        res = []
-        for neuron in self.neurons:
-            res.append(neuron.forward(inputs))
-        return res
+    def forward(self, X):
+        return [neuron.forward(X) for neuron in self.neurons]
 
     def parameters(self):
-        params = []
-        for neuron in self.neurons:
-            params += neuron.parameters()
-        return params
+        # initial = []
+        # for neuron in self.neurons:
+        #     print(neuron.parameters())
+        #     initial.extend(neuron.parameters())
+        # return initial
+        return [param for neuron in self.neurons for param in neuron.parameters()]
 
+
+class Model:
+    def __init__(self, layers):
+        self.layers = layers
+    
+    def forward(self, X):
+        for layer in self.layers:
+            X = layer.forward(X)
+        return X
+    
+    def parameters(self):
+        return [param for layer in self.layers for param in layer.parameters()]
+
+    def backward(self):
+        pass
 
 ########################## Loss Functions ##############################
 
