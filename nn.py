@@ -35,28 +35,24 @@ class Layer:
         return [neuron.forward(X) for neuron in self.neurons]
 
     def parameters(self):
-        # initial = []
-        # for neuron in self.neurons:
-        #     print(neuron.parameters())
-        #     initial.extend(neuron.parameters())
-        # return initial
         return [param for neuron in self.neurons for param in neuron.parameters()]
 
 
 class Model:
     def __init__(self, layers):
         self.layers = layers
-    
+
     def forward(self, X):
         for layer in self.layers:
             X = layer.forward(X)
         return X
-    
+
     def parameters(self):
         return [param for layer in self.layers for param in layer.parameters()]
 
     def backward(self):
         pass
+
 
 ########################## Loss Functions ##############################
 
