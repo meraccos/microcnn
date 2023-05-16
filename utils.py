@@ -1,21 +1,40 @@
 from graphviz import Digraph
+import random
+from microcnn.nn import Softmax
 
-
-def train(model, X, y, n_epochs, loss_fc, optimizer):
+def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer):
     for epoch in range(n_epochs):
-        model_out = model.forward(X)
+        # Randomly pick the batch of training data
+        t_data_idx = random.sample(list(range(len(X_all))),
+                                   k=min(len(X_all), batch_size), )
+        
+        X_train = [X_all[index] for index in t_data_idx]
+        y_train = [y_all[index] for index in t_data_idx]
+        
+        epoch_loss = 0.0
+        for X, y in zip(X_train, y_train):  #X = [1.0], y = [0.8]
+            model_out = model.forward(X)
+            # model_out = Softmax.forward(model_out)
+            
 
-        loss = loss_fc.forward(model_out[0], y)
+            loss = loss_fc.forward(model_out, y)
+            loss.backward(grad=1.0)
+            
+            epoch_loss += loss.data
 
+        # print(model.parameters())
+        optimizer.step(model.parameters(), lr=1e-2)
+        # print(model.parameters())
+        # print(model.layers[0].parameters())
         loss.zero_grad()
-        loss.backward(grad=1.0)
+        # print(model.parameters())
 
-        optimizer.forward(model.parameters())
-
-        if epoch % 10 == 0:
+        if epoch % 1 == 0:
+            avg_loss = epoch_loss / len(X_train)
             print(
-                f"# Epoch: {epoch},   loss: {loss.data:.3f},   out: {model_out[0].data:.3f}"
+                f"# Epoch: {epoch},   average loss: {avg_loss:.3f}"
             )
+    return model, loss
 
 
 def to_dot(node, dot=None):

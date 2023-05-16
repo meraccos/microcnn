@@ -1,0 +1,7 @@
+setup.py
+microcnn/nn.py
+microcnn/value.py
+microcnn.egg-info/PKG-INFO
+microcnn.egg-info/SOURCES.txt
+microcnn.egg-info/dependency_links.txt
+microcnn.egg-info/top_level.txt
