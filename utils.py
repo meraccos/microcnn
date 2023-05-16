@@ -1,8 +1,9 @@
 from graphviz import Digraph
 import random
 from microcnn.nn import Softmax
+from graphviz import Source
 
-def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer):
+def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_clip=1.0):
     for epoch in range(n_epochs):
         # Randomly pick the batch of training data
         t_data_idx = random.sample(list(range(len(X_all))),
@@ -12,27 +13,60 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer):
         y_train = [y_all[index] for index in t_data_idx]
         
         epoch_loss = 0.0
+        eval = 0
+        eval_probs = []
+        found = []
+        
         for X, y in zip(X_train, y_train):  #X = [1.0], y = [0.8]
             model_out = model.forward(X)
-            # model_out = Softmax.forward(model_out)
+            model_out = Softmax().forward(model_out)
             
-
+            preds = [val.data for val in model_out]
+            prob = 0
+            pred = None
+            
+            for index, val in enumerate(preds):
+                if val > prob:
+                    prob = val
+                    pred = index
+            
+            if y[pred] == 1:
+                print(pred)
+                eval += 1
+                eval_probs.append(prob)
+                found.append(pred)
+            
+            # output = [round(val.data,2) for val in model_out]
+            # print('model out:', output)
+            # print('expected:', y)
+            # print('input: ', X)
+            
             loss = loss_fc.forward(model_out, y)
-            loss.backward(grad=1.0)
+            loss.grad = 1.0
+            print('backwarding')
+            loss.backward()
             
             epoch_loss += loss.data
 
-        # print(model.parameters())
-        optimizer.step(model.parameters(), lr=1e-2)
-        # print(model.parameters())
-        # print(model.layers[0].parameters())
-        loss.zero_grad()
-        # print(model.parameters())
+        for param in model.parameters():
+            param.grad /= len(X_train)
+            param.grad = max(-grad_clip, min(param.grad, grad_clip))
+
+        grads = [param.grad for param in model.parameters()]
+
+        print('max grad: ', max(grads))
+        print('min grad: ', min(grads))
+        print('ave grad: ', sum(grads) / len(grads))
+
+        optimizer.step(model.parameters(), lr=3e-4)
+        
+        for param in model.parameters():
+            param.grad = 0
 
         if epoch % 1 == 0:
             avg_loss = epoch_loss / len(X_train)
             print(
-                f"# Epoch: {epoch},   average loss: {avg_loss:.3f}"
+                f"# Epoch: {epoch},   average loss: {avg_loss:.3f}, average accuracy: {eval} / {len(X_train)}, probs: {eval_probs} found values: {found}"
             )
     return model, loss
 
@@ -55,3 +89,6 @@ def to_dot(node, dot=None):
             to_dot(child, dot)
 
     return dot
+
+# dot = to_dot(loss)
+# Source(dot.source)

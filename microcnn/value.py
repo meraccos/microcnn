@@ -69,16 +69,21 @@ class Value:
         result = Value(data=math.log(self.data), children=[self], op="log")
         return result
 
+    def tanh(self):
+        result = Value(data=math.tanh(self.data), children=[self], op="tanh")
+        return result
+    
+    def exp(self):
+        result = Value(data=math.exp(self.data), children=[self], op="exp")
+        return result
+
     def zero_grad(self):
         self.grad = 0.0
         if self.children:
             for child in self.children:
                 child.zero_grad()
 
-    def backward(self, grad=None):
-        if grad:
-            self.grad = grad
-
+    def backward(self):
         if self.op == "+":
             self.children[0].grad += self.grad
             self.children[1].grad += self.grad
@@ -100,6 +105,12 @@ class Value:
             )
         elif self.op == "log":
             self.children[0].grad += self.grad / self.children[0].data
+            
+        elif self.op == "tanh":
+            self.children[0].grad += self.grad * (1 - self.data ** 2)
+        
+        elif self.op == "exp":
+            self.children[0].grad += self.grad * self.data
 
         if self.children:
             for child in self.children:

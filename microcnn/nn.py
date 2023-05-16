@@ -1,4 +1,6 @@
-import math
+''' 
+The Neural Network definitions
+'''
 from microcnn.value import Value
 import random
 
@@ -16,7 +18,7 @@ class Neuron:
     def __repr__(self):
         return (
             f"Neuron(w: {[f'{i.data:.3f}' for i in self.w]}"
-            + f" b: {self.b.data:.3f}, act: {self.a.data:.3f}"
+            + f" b: {self.b.data:.3f}"
         )
 
     def forward(self, X):
@@ -33,6 +35,7 @@ class Neuron:
 
 class Layer:
     def __init__(self, n_inputs, n_neurons, act_fn):
+        self.n_inputs = n_inputs
         self.neurons = [Neuron(n_inputs, act_fn) for i in range(n_neurons)]
 
     def forward(self, X):
@@ -49,14 +52,12 @@ class Model:
 
     def forward(self, X):
         for layer in self.layers:
+            assert len(X) == layer.n_inputs, "Mismatch in input to the layer size"
             X = layer.forward(X)
         return X
 
     def parameters(self):
         return [param for layer in self.layers for param in layer.parameters()]
-
-    def backward(self):
-        pass
 
 
 ########################## Loss Functions ##############################
@@ -81,21 +82,29 @@ class CrossEntropyLoss:
 class ReLU:
     def forward(self, n_out):
         if n_out.data > 0:
-            result = n_out + 0
+            result = n_out
         else:
             result = n_out * 0
+        return result
+
+class LeakyReLU:
+    def forward(self, n_out):
+        if n_out.data > 0:
+            result = n_out
+        else:
+            result = n_out * 0.01
         return result
 
 
 class Tanh:
     def forward(self, n_out):
-        result = (math.e ** (n_out) - math.e ** (-n_out)) / (math.e ** (n_out) + math.e ** (-n_out))
+        result = n_out.tanh()
         return result
 
 
 class Softmax:
     def forward(self, layer_values):
-        exp_vals = [Value(math.e ** val.data, children=[val]) for val in layer_values]
+        exp_vals = [val.exp() for val in layer_values]
         exp_sum = sum(exp_vals)
         result = [exp_val / exp_sum for exp_val in exp_vals]
         return result
