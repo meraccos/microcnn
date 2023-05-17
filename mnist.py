@@ -8,7 +8,7 @@ mnist_trainset = datasets.MNIST(root='./data',
                                 download=True, 
                                 transform=None)
 
-t_data_idx = list(range(5))
+t_data_idx = list(range(10000))
 
 img_data_list = [list(mnist_trainset[i][0].getdata()) for i in t_data_idx]
 img_labels = [mnist_trainset[i][1] for i in t_data_idx]
@@ -18,9 +18,9 @@ img_data_scaled = [[pixel / 255.0 - 0.5 for pixel in image] for image in img_dat
 
 model = nn.Model(
     [
-        nn.Layer(n_inputs=784, n_neurons=16, act_fn=nn.Tanh()),
-        nn.Layer(n_inputs=16, n_neurons=16, act_fn=nn.Tanh()),
-        nn.Layer(n_inputs=16, n_neurons=10, act_fn=nn.ReLU()),
+        nn.Layer(n_inputs=784, n_neurons=16, act_fn=nn.LeakyReLU()),
+        nn.Layer(n_inputs=16, n_neurons=16, act_fn=nn.LeakyReLU()),
+        nn.Layer(n_inputs=16, n_neurons=10, act_fn=nn.LeakyReLU()),
     ]
 )
 
@@ -32,6 +32,6 @@ optimizer = nn.SGD()
 train(model=model, 
       X_all=img_data_scaled, 
       y_all=img_labels_10, 
-      n_epochs=55, 
+      n_epochs=10000, 
       batch_size = 5, 
       loss_fc=loss_fc, optimizer=optimizer)

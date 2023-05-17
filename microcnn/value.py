@@ -76,12 +76,12 @@ class Value:
     def exp(self):
         result = Value(data=math.exp(self.data), children=[self], op="exp")
         return result
-
+    
     def zero_grad(self):
         self.grad = 0.0
-        if self.children:
-            for child in self.children:
-                child.zero_grad()
+        # if self.children:
+        #     for child in self.children:
+        #         child.zero_grad()
 
     def backward(self):
         if self.op == "+":
@@ -112,6 +112,6 @@ class Value:
         elif self.op == "exp":
             self.children[0].grad += self.grad * self.data
 
-        if self.children:
-            for child in self.children:
-                child.backward()
+        # if self.children:
+        #     for child in self.children:
+        #         child.backward()

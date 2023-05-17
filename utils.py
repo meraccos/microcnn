@@ -40,6 +40,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
             # print('model out:', output)
             # print('expected:', y)
             # print('input: ', X)
+            print(len(model.parameters()))
             
             loss = loss_fc.forward(model_out, y)
             loss.grad = 1.0
@@ -58,7 +59,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
         print('min grad: ', min(grads))
         print('ave grad: ', sum(grads) / len(grads))
 
-        optimizer.step(model.parameters(), lr=3e-4)
+        optimizer.step(model.parameters(), lr=3e-3)
         
         for param in model.parameters():
             param.grad = 0
@@ -76,14 +77,14 @@ def to_dot(node, dot=None):
         dot = Digraph()
         dot.attr(rankdir="RL")  # sets the direction of the graph to right-left
         dot.node(
-            name=str(id(node)), label=f"{node.data:.3f}\n{node.grad:.3f}\n{node.op}"
+            name=str(id(node)), label=f"{node.data:.3f}\ngrad:{node.grad:.3f}\n{node.op}"
         )
 
     if node.children:
         for child in node.children:
             dot.node(
                 name=str(id(child)),
-                label=f"{child.data:.3f}\n{child.grad:.3f}\n{child.op}",
+                label=f"{child.data:.3f}\ngrad:{child.grad:.3f}\n{child.op}",
             )
             dot.edge(str(id(node)), str(id(child)))
             to_dot(child, dot)
