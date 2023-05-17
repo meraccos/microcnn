@@ -5,7 +5,6 @@ from microcnn.value import Value
 import random
 import math
 
-
 #################### Neuron, Layer, and Model ############################
 
 
@@ -16,6 +15,7 @@ class Neuron:
         self.b = Value(random.uniform(-0.1, 0.1), op='b')
         self.X = None
         self.z = Value(0.0)
+        self.X = []
 
     def forward(self, X):
         self.X = X
@@ -31,16 +31,14 @@ class Neuron:
         self.b.grad += self.z.grad
 
     def parameters(self):
-        if self.X:
-            return self.w + self.X + [self.b, self.z]
-        return self.w + [self.b, self.z]
+        return self.w + [self.b, self.z] + self.X
 
 class Layer:
     def __init__(self, n_inputs, n_neurons, act_fn=None):
         self.n_inputs = n_inputs
-        self.act_fn = act_fn
+        self.act_fn = act_fn if act_fn else Identity()
         self.neurons = [Neuron(n_inputs) for i in range(n_neurons)]
-        self.act_out = None
+        self.act_out = []
 
     def forward(self, X):
         neuron_out = [neuron.forward(X) for neuron in self.neurons]
@@ -56,11 +54,8 @@ class Layer:
             neuron.backward()
 
     def parameters(self):
-        if self.act_fn:
-            if self.act_out:
-                return [param for neuron in self.neurons for param in neuron.parameters()]+self.act_out
-            return [param for neuron in self.neurons for param in neuron.parameters()]
-        return [param for neuron in self.neurons for param in neuron.parameters()]
+        return [param for neuron in self.neurons 
+                for param in neuron.parameters()]+self.act_out
 
 
 class Model:
@@ -74,7 +69,6 @@ class Model:
         return X
     
     def backward(self):
-        # self.zero_grad()
         for layer in reversed(self.layers):
             layer.backward()
 
@@ -94,31 +88,15 @@ class RMSLoss:
         assert len(Y_pred) == len(Y_gt), "Size mismatch"
         self.Y_pred = Y_pred  
         self.Y_diff = [(y_pred.data - y_gt.data) for y_pred, y_gt in zip(Y_pred, Y_gt)]
-        self.loss = (sum(y_diff**2 for y_diff in self.Y_diff) / len(Y_pred)) ** 0.5
-        self.loss_val = Value(self.loss, children=Y_pred+Y_gt, op='rms_loss', grad=1.0)
+        self.loss = (sum(dy**2 for dy in self.Y_diff) / len(Y_pred)) ** 0.5
         
-        return self.loss_val
+        return Value(self.loss, children=Y_pred+Y_gt, op='rms_loss', grad=1.0)
     
     def backward(self):
         for y_pred, y_diff in zip(self.Y_pred, self.Y_diff):
             y_pred.grad += 2 * y_diff / (self.loss * len(self.Y_pred))
     
     
-class CrossEntropyLoss:
-    def forward(self, Y_pred, Y_gt):
-        assert len(Y_pred) == len(Y_gt), "Size mismatch"
-        self.Y_pred = Y_pred
-        self.Y_gt = Y_gt
-        loss = -sum(y_gt.data * math.log(y_pred.data) 
-                    for y_pred, y_gt in zip(Y_pred, Y_gt))
-        loss_val = Value(loss, children=Y_pred+Y_gt, op='cce_loss', grad=1.0)
-        return loss_val
-    
-    def backward(self):
-        for y_pred, y_gt in zip(self.Y_pred, self.Y_gt):
-            y_pred.grad += - y_gt.data / y_pred.data
-
-
 class SoftmaxCrossEntropyLoss:
     def forward(self, Y_pred, Y_gt):
         assert len(Y_pred) == len(Y_gt), "Size mismatch"
@@ -133,68 +111,50 @@ class SoftmaxCrossEntropyLoss:
         # Compute cross-entropy loss
         loss = -sum(y_gt.data * math.log(y_softmax) 
                     for y_gt, y_softmax in zip(Y_gt, self.softmax_data))
-        self.loss_val = Value(loss, children=Y_pred+Y_gt, op='softmax_cce_loss')
-        return self.loss_val
+        
+        return Value(loss, children=Y_pred+Y_gt, op='softmax_cce_loss')
 
     def backward(self):
         for y_pred, y_softmax, y_gt in zip(self.Y_pred, self.softmax_data, self.Y_gt):
-            # Gradient is softmax outputs - ground truth
             y_pred.grad += y_softmax - y_gt.data
             
             
 ######################### Activation Functions #########################
 
 
-class ReLU:
+class BaseActivation:
     def forward(self, neuron_outs):
-        self.outs = [Value(max(val.data, 0), children=[val], op='relu') 
-                for val in neuron_outs]
-        return self.outs
-
-    def backward(self):
-        for out in self.outs:
-            out.children[0].grad += out.grad * (out.data >0)
-
-
-class LeakyReLU:
-    def forward(self, neuron_outs):
-        self.outs = [Value(max(val.data, 0.01 * val.data), children=[val], op='l_relu') 
-                for val in neuron_outs]
-        return self.outs
-
-    def backward(self):
-        for out in self.outs:
-            out.children[0].grad += out.grad * (1 if out.data > 0 else 0.01)
-            
-
-class Tanh:
-    def forward(self, neuron_outs):
-        self.outs = [Value(math.tanh(val.data), children=[val], op='tanh') 
+        self.outs = [Value(self._activation(val.data), children=[val], op=self.op) 
                      for val in neuron_outs]
         return self.outs
-    
+
     def backward(self):
         for out in self.outs:
-            out.children[0].grad += out.grad * (1 - out.data**2)
+            out.children[0].grad += out.grad * self._derivative(out.data)
 
 
-class Softmax:
-    def forward(self, neuron_outs):
-        exp_vals = [math.exp(val.data) for val in neuron_outs]
-        exp_sum = sum(exp_vals)
-        softmax_data = [exp_val / exp_sum for exp_val in exp_vals]
+class Identity(BaseActivation):
+    op = 'identity'
+    _activation = staticmethod(lambda x: x)
+    _derivative = staticmethod(lambda x: 1)
 
-        self.outs = [Value(data, children=[neuron_outs[i]], op='softmax') 
-                  for i, data in enumerate(softmax_data)]
-        return self.outs
 
-    def backward(self):
-        for i, out in enumerate(self.outs):
-            for j, _ in enumerate(self.outs):
-                if i == j:
-                    out.children[0].grad += out.grad * (1 - out.data)
-                else:
-                    out.children[0].grad -= out.grad * out.data
+class ReLU(BaseActivation):
+    op = 'relu'
+    _activation = staticmethod(lambda x: max(x, 0))
+    _derivative = staticmethod(lambda x: x > 0)
+
+
+class LeakyReLU(BaseActivation):
+    op = 'l_relu'
+    _activation = staticmethod(lambda x: max(x, 0.01 * x))
+    _derivative = staticmethod(lambda x: 1 if x > 0 else 0.01)
+    
+    
+class Tanh(BaseActivation):
+    op = 'tanh'
+    _activation = staticmethod(math.tanh)
+    _derivative = staticmethod(lambda x: 1 - x**2)
         
 
 ######################### Optimizers ###################################

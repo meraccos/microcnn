@@ -1,7 +1,6 @@
 from graphviz import Digraph
+# from graphviz import Source
 import random
-from microcnn.nn import Softmax
-from graphviz import Source
 import torchvision.datasets as datasets
 from microcnn.value import Value
 
@@ -10,8 +9,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
     n_samples = len(X_all)
     for epoch in range(n_epochs):
         # Randomly permute the indices of the data points
-        indices = list(range(n_samples))
-        random.shuffle(indices)
+        indices = random.sample(range(n_samples), n_samples)
 
         epoch_loss = 0.0
         correct = 0
@@ -42,7 +40,6 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
                 if model_pred == y_gt:
                     correct += 1
 
-                # model.zero_grad()
                 loss_fc.backward()
                 model.backward()
 
