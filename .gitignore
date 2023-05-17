@@ -3,4 +3,4 @@
 *.ipynb
 data/*
 microcnn/nn.py
-playground.ipynb
+# playground.ipynb

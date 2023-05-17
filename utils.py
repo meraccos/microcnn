@@ -4,72 +4,80 @@ from microcnn.nn import Softmax
 from graphviz import Source
 
 def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_clip=1.0):
+    n_samples = len(X_all)
     for epoch in range(n_epochs):
-        # Randomly pick the batch of training data
-        t_data_idx = random.sample(list(range(len(X_all))),
-                                   k=min(len(X_all), batch_size), )
-        
-        X_train = [X_all[index] for index in t_data_idx]
-        y_train = [y_all[index] for index in t_data_idx]
-        
+        # Randomly permute the indices of the data points
+        indices = list(range(n_samples))
+        random.shuffle(indices)
+
         epoch_loss = 0.0
-        eval = 0
-        eval_probs = []
-        found = []
-        
-        for X, y in zip(X_train, y_train):  #X = [1.0], y = [0.8]
-            model_out = model.forward(X)
-            model_out = Softmax().forward(model_out)
-            
-            preds = [val.data for val in model_out]
-            prob = 0
-            pred = None
-            
-            for index, val in enumerate(preds):
-                if val > prob:
-                    prob = val
-                    pred = index
-            
-            if y[pred] == 1:
-                print(pred)
-                eval += 1
-                eval_probs.append(prob)
-                found.append(pred)
-            
-            # output = [round(val.data,2) for val in model_out]
-            # print('model out:', output)
-            # print('expected:', y)
-            # print('input: ', X)
-            print(len(model.parameters()))
-            
-            loss = loss_fc.forward(model_out, y)
-            loss.grad = 1.0
-            print('backwarding')
-            loss.backward()
-            
-            epoch_loss += loss.data
+        correct = 0
 
-        for param in model.parameters():
-            param.grad /= len(X_train)
-            param.grad = max(-grad_clip, min(param.grad, grad_clip))
+        for i in range(0, n_samples, batch_size):
+            # Get the indices for this batch
+            batch_indices = indices[i : i + batch_size]
 
-        grads = [param.grad for param in model.parameters()]
+            X_batch = [X_all[idx] for idx in batch_indices]
+            y_batch = [y_all[idx] for idx in batch_indices]
 
-        print('max grad: ', max(grads))
-        print('min grad: ', min(grads))
-        print('ave grad: ', sum(grads) / len(grads))
+            # Zero out the gradients from the previous batch
+            model.zero_grad()
 
-        optimizer.step(model.parameters(), lr=3e-3)
-        
-        for param in model.parameters():
-            param.grad = 0
+            # Perform forward and backward pass for each data point in batch
+            for X, y in zip(X_batch, y_batch):
+                model_out = model.forward(X)
+                loss = loss_fc.forward(model_out, y)
+                epoch_loss += loss.data
 
-        if epoch % 1 == 0:
-            avg_loss = epoch_loss / len(X_train)
-            print(
-                f"# Epoch: {epoch},   average loss: {avg_loss:.3f}, average accuracy: {eval} / {len(X_train)}, probs: {eval_probs} found values: {found}"
-            )
+                # Count number of correct predictions
+                model_out_data = [val.data for val in model_out]
+                y_data = [val.data for val in y]
+
+                model_pred = max(enumerate(y_data), key=lambda pair: pair[1])[0]
+                y_gt = max(enumerate(model_out_data), key=lambda pair: pair[1])[0]
+
+                if model_pred == y_gt:
+                    correct += 1
+
+                # model.zero_grad()
+                loss_fc.backward()
+                model.backward()
+
+            # Average and clip the gradients
+            for param in model.parameters():
+                param.grad /= len(batch_indices)
+                param.grad = max(min(param.grad, grad_clip), -grad_clip)
+
+            # Update the parameters
+            optimizer.step(model.parameters(), lr=3e-3)
+
+        avg_loss = epoch_loss / n_samples
+        accuracy = correct / n_samples
+        print(
+            f"Epoch {epoch+1}/{n_epochs}, Average Loss: {avg_loss:.3f}, Accuracy: {accuracy*100:.2f}%"
+        )
+
     return model, loss
+
+
+def test(model, X_test, y_test):
+    n_samples = len(X_test)
+    correct = 0
+
+    for X, y in zip(X_test, y_test):
+        model_out = model.forward(X)
+        model_out_data = [val.data for val in model_out]
+        y_data = [val.data for val in y]
+
+        model_pred = max(enumerate(y_data), key=lambda pair: pair[1])[0]
+        y_gt = max(enumerate(model_out_data), key=lambda pair: pair[1])[0]
+
+        if model_pred == y_gt:
+            correct += 1
+
+    accuracy = correct / n_samples
+    print(f"Test Accuracy: {accuracy * 100:.2f}%")
+    return accuracy
 
 
 def to_dot(node, dot=None):
@@ -77,7 +85,8 @@ def to_dot(node, dot=None):
         dot = Digraph()
         dot.attr(rankdir="RL")  # sets the direction of the graph to right-left
         dot.node(
-            name=str(id(node)), label=f"{node.data:.3f}\ngrad:{node.grad:.3f}\n{node.op}"
+            name=str(id(node)),
+            label=f"{node.data:.3f}\ngrad:{node.grad:.3f}\n{node.op}",
         )
 
     if node.children:
@@ -90,6 +99,7 @@ def to_dot(node, dot=None):
             to_dot(child, dot)
 
     return dot
+
 
 # dot = to_dot(loss)
 # Source(dot.source)

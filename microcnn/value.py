@@ -5,11 +5,11 @@ import math
 
 
 class Value:
-    def __init__(self, data, children=None, op=None):
+    def __init__(self, data, children=None, op=None, grad=0.0):
         self.data = data
         self.children = children
         self.op = op
-        self.grad = 0.0
+        self.grad = grad
         self.momentum = 0.0
 
     def __repr__(self):
@@ -64,24 +64,6 @@ class Value:
             other = Value(other)
         result = Value(data=self.data**other.data, children=[self, other], op="**")
         return result
-    
-    def log(self):
-        result = Value(data=math.log(self.data), children=[self], op="log")
-        return result
-
-    def tanh(self):
-        result = Value(data=math.tanh(self.data), children=[self], op="tanh")
-        return result
-    
-    def exp(self):
-        result = Value(data=math.exp(self.data), children=[self], op="exp")
-        return result
-    
-    def zero_grad(self):
-        self.grad = 0.0
-        # if self.children:
-        #     for child in self.children:
-        #         child.zero_grad()
 
     def backward(self):
         if self.op == "+":
@@ -103,15 +85,3 @@ class Value:
             self.children[1].grad += self.grad * (
                 math.log(abs(self.children[0].data)) * self.data
             )
-        elif self.op == "log":
-            self.children[0].grad += self.grad / self.children[0].data
-            
-        elif self.op == "tanh":
-            self.children[0].grad += self.grad * (1 - self.data ** 2)
-        
-        elif self.op == "exp":
-            self.children[0].grad += self.grad * self.data
-
-        # if self.children:
-        #     for child in self.children:
-        #         child.backward()
