@@ -2,5 +2,3 @@
 *.gz
 *.ipynb
 data/*
-microcnn/nn.py
-# playground.ipynb

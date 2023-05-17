@@ -62,8 +62,6 @@ class Layer:
             return [param for neuron in self.neurons for param in neuron.parameters()]
         return [param for neuron in self.neurons for param in neuron.parameters()]
 
-        # return [param for neuron in self.neurons for param in neuron.parameters()]
-
 
 class Model:
     def __init__(self, layers):

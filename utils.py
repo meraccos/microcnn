@@ -2,6 +2,9 @@ from graphviz import Digraph
 import random
 from microcnn.nn import Softmax
 from graphviz import Source
+import torchvision.datasets as datasets
+from microcnn.value import Value
+
 
 def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_clip=1.0):
     n_samples = len(X_all)
@@ -78,6 +81,26 @@ def test(model, X_test, y_test):
     accuracy = correct / n_samples
     print(f"Test Accuracy: {accuracy * 100:.2f}%")
     return accuracy
+
+
+def mnist_data_retriever(data_idx_start, data_idx_end, train_bool):
+    mnist_dataset = datasets.MNIST(root='./data', 
+                                train=train_bool, 
+                                download=True, 
+                                transform=None)
+
+    data_idx = list(range(data_idx_start, data_idx_end))
+
+    images = [list(mnist_dataset[i][0].getdata()) for i in data_idx]
+    labels = [mnist_dataset[i][1] for i in data_idx]
+
+    labels_base10 = [[Value(1.0, op='in') if i == label else Value(0.0, op='in') 
+                    for i in range(10)] for label in labels]
+
+    images_scaled = [[Value(pixel / 255.0, op='in') 
+                        for pixel in image] for image in images]
+    
+    return images_scaled, labels_base10
 
 
 def to_dot(node, dot=None):
