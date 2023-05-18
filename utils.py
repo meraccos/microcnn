@@ -96,7 +96,7 @@ def mnist_data_retriever(data_idx_start, data_idx_end, train_bool):
     labels_base10 = [[Value(1.0, op='in') if i == label else Value(0.0, op='in') 
                     for i in range(10)] for label in labels]
 
-    images_scaled = [[Value(pixel * 2 / 255.0 - 1.0, op='in') 
+    images_scaled = [[Value(pixel / 255.0, op='in') 
                         for pixel in image] for image in images]
     
     return images_scaled, labels_base10
