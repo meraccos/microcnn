@@ -4,12 +4,13 @@ The datatype definition for the neuron gradient operations
 
 
 class Value:
-    def __init__(self, data, children=[], op=None, grad=0.0):
+    def __init__(self, data, children=[], op=None, grad=0.0, momentum= 0.0, velocity=0.0):
         self.data = data
         self.children = children
         self.op = op
         self.grad = grad
         self.momentum = 0.0
+        self.velocity = 0.0
 
     def __repr__(self):
         return (

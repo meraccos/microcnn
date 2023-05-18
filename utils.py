@@ -51,7 +51,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
                 param.grad = max(min(param.grad, grad_clip), -grad_clip)
 
             # Update the parameters
-            optimizer.step(model.parameters(), lr=3e-3)
+            optimizer.step(model.parameters())
 
         avg_loss = epoch_loss / n_samples
         accuracy = correct / n_samples

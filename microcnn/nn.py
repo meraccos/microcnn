@@ -146,21 +146,24 @@ class LeakyReLU(BaseActivation):
     op = 'l_relu'
     _activation = staticmethod(lambda x: max(x, 0.01 * x))
     _derivative = staticmethod(lambda x: 1 if x > 0 else 0.01)
-    
-    
+
+
 class Tanh(BaseActivation):
     op = 'tanh'
     _activation = staticmethod(math.tanh)
     _derivative = staticmethod(lambda x: 1 - x**2)
-        
+
 
 ######################### Optimizers ###################################
 
 
 class SGD:
-    def step(self, vals, lr=1e-3, m=0.9):
+    def __init__(self, lr=0.01, m=0.9):
+        self.lr = lr
+        self.m = m
+    def step(self, vals):
         for val in vals:
-            val.momentum = m * val.momentum + lr * val.grad
+            val.momentum = self.m * val.momentum + self.lr * val.grad
             val.data -= val.momentum
 
 
@@ -172,7 +175,7 @@ class Adam:
         self.eps = eps
         self.t = t
 
-    def step(self, vals, lr=0):
+    def step(self, vals):
         self.t += 1
         for val in vals:
             val.momentum = self.beta1 * val.momentum + (1 - self.beta1) * val.grad
