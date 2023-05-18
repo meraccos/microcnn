@@ -4,7 +4,7 @@ The datatype definition for the neuron gradient operations
 
 
 class Value:
-    def __init__(self, data, children=[], op=None, grad=0.0, momentum= 0.0, velocity=0.0):
+    def __init__(self, data, children=[], op=None, grad=0.0):
         self.data = data
         self.children = children
         self.op = op
@@ -16,12 +16,8 @@ class Value:
         return (
             f"Value(data: {self.data:.3f}, "
             + f"grad: {self.grad:.3f}, "
-            + f"op: {self.op}"
-            + (
-                f", children: {[f'{c.data:.3f}' for c in self.children]})"
-                if self.children
-                else ")"
-            )
+            + f"op: {self.op}, "
+            + f"children: {[f'{c.data:.3f}' for c in self.children]}"
         )
 
     def __radd__(self, other):

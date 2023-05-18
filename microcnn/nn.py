@@ -14,6 +14,7 @@ class Neuron:
                   for _ in range(in_dim)]
         self.b = Value(random.uniform(-0.1, 0.1), op='b')
         self.act_fn = act_fn() or Identity()
+        self.act_out = Value(0.0)
 
     def forward(self, X):
         self.X = X
@@ -33,12 +34,13 @@ class Neuron:
         return self.w + [self.b, self.act_out]
     
 
-class Layer:
+class Linear:
     def __init__(self, n_inputs, n_neurons, act_fn=None):
         self.n_inputs = n_inputs
         self.neurons = [Neuron(n_inputs, act_fn) for i in range(n_neurons)]
 
     def forward(self, X):
+        assert len(X) == self.n_inputs, "Size mismatch"
         return [neuron.forward(X) for neuron in self.neurons]
 
     def backward(self):
@@ -50,13 +52,32 @@ class Layer:
                 for param in neuron.parameters()]
 
 
+class Dropout:
+    def __init__(self, dropout_rate=0.5):
+        self.dropout_rate = dropout_rate
+        self.mask = None
+
+    def forward(self, X):
+        self.X = X
+        self.n_inputs = len(X)
+        self.mask = [random.uniform(0, 1) > self.dropout_rate for _ in X]
+        return [x if mask else Value(0.0, op='dropout') for x, mask in zip(X, self.mask)]
+
+    def backward(self):
+        for x, mask in zip(self.X, self.mask):
+            if mask:
+                x.grad += self.dropout_rate
+
+    def parameters(self):
+        return []  
+
+
 class Model:
     def __init__(self, layers):
         self.layers = layers
 
     def forward(self, X):
         for layer in self.layers:
-            assert len(X) == layer.n_inputs, "Size mismatch"
             X = layer.forward(X)
         return X
     
@@ -79,27 +100,54 @@ class Model:
 ########################## Loss Functions ##############################
 
 
-class RMSLoss:
-    def forward(self, Y_pred, Y_gt):
+class BaseLoss:
+    def __init__(self, l1_coeff, l2_coeff):
+        self.l1_coeff = l1_coeff
+        self.l2_coeff = l2_coeff
+    
+    def _wb(self, parameters):
+        return [val for val in parameters if val.op in ['w', 'b']]
+    
+    def L_forward(self, parameters):
+        self.wb = self._wb(parameters)
+        wb_abs = [abs(val.data) for val in self.wb]
+        wb_sq = [val.data**2 for val in self.wb]
+        return self.l1_coeff * sum(wb_abs) + self.l2_coeff * sum(wb_sq)
+    
+    def L_backward(self):
+        for val in self.wb:
+            val.grad += self.l1_coeff * (0 if val.data == 0 else 1 if val.data > 0 else -1)
+            val.grad += 2 * self.l2_coeff * val.data
+    
+    
+class RMSLoss(BaseLoss):
+    def __init__(self, l1_coeff=0.0, l2_coeff=0.0):
+        super().__init__(l1_coeff, l2_coeff)
+        
+    def forward(self, Y_pred, Y_gt, parameters):
         assert len(Y_pred) == len(Y_gt), "Size mismatch"
         self.Y_pred = Y_pred  
         self.Y_diff = [(y_pred.data - y_gt.data) for y_pred, y_gt in zip(Y_pred, Y_gt)]
         self.loss = (sum(dy**2 for dy in self.Y_diff) / len(Y_pred)) ** 0.5
-        
-        return Value(self.loss, children=Y_pred+Y_gt, op='rms_loss', grad=1.0)
-    
+        self.lloss = self.loss + self.L_forward(parameters)
+        return Value(self.lloss, children=Y_pred+Y_gt, op='rms_loss', grad=1.0)
+     
     def backward(self):
         for y_pred, y_diff in zip(self.Y_pred, self.Y_diff):
             y_pred.grad = 2 * y_diff / (self.loss * len(self.Y_pred))
+        self.L_backward()
     
     
-class SoftmaxCrossEntropyLoss:
+class SoftmaxCrossEntropyLoss(BaseLoss):
+    def __init__(self, l1_coeff=0.0, l2_coeff=0.0):
+        super().__init__(l1_coeff, l2_coeff)    
+
     def _apply_softmax(self, Y_pred):
         exp_vals = [math.exp(val.data) for val in Y_pred]
         exp_sum = sum(exp_vals)
         return [exp_val / exp_sum for exp_val in exp_vals]
     
-    def forward(self, Y_pred, Y_gt):
+    def forward(self, Y_pred, Y_gt, parameters):
         assert len(Y_pred) == len(Y_gt), "Size mismatch"
         self.Y_pred = Y_pred
         self.Y_gt = Y_gt
@@ -108,12 +156,14 @@ class SoftmaxCrossEntropyLoss:
         # Compute cross-entropy loss
         loss = -sum(y_gt.data * math.log(y_sm) 
                     for y_gt, y_sm in zip(Y_gt, self.softmax_data))
+        self.lloss = loss + self.L_forward(parameters)
         
-        return Value(loss, children=Y_pred+Y_gt, op='softmax_cce_loss', grad=1.0)
+        return Value(self.lloss, children=Y_pred+Y_gt, op='softmax_cce_loss', grad=1.0)
 
     def backward(self):
         for y_pred, y_softmax, y_gt in zip(self.Y_pred, self.softmax_data, self.Y_gt):
             y_pred.grad = y_softmax - y_gt.data
+        self.L_backward()
             
             
 ######################### Activation Functions #########################
