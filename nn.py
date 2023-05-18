@@ -9,53 +9,47 @@ import math
 
 
 class Neuron:
-    def __init__(self, in_dim):
+    def __init__(self, in_dim, act_fn=None):
         self.w = [Value(random.uniform(-0.1, 0.1), op='w') 
                   for _ in range(in_dim)]
         self.b = Value(random.uniform(-0.1, 0.1), op='b')
-        self.X = None
-        self.z = Value(0.0)
-        self.X = []
+        self.act_fn = act_fn() or Identity()
 
     def forward(self, X):
         self.X = X
         output = sum([w.data * x.data for w, x in zip(self.w, X)], self.b.data)
         self.z = Value(output, children=self.w+X+[self.b], op='neuron')
-        return self.z
+        self.act_out = self.act_fn.forward(self.z)
+        return self.act_out
     
     def backward(self):
+        self.act_fn.backward()
         for w, x in zip(self.w, self.X):
             w.grad += self.z.grad * x.data
-            if x.children:
-                x.grad += self.z.grad * w.data
-        self.b.grad += self.z.grad
+            x.grad += self.z.grad * w.data
+        self.b.grad += self.z.grad  
 
     def parameters(self):
-        return self.w + [self.b, self.z] + self.X
+        return self.w + [self.b, self.z, self.act_out]
+    
+    # def parameters(self):
+    #     return self.w + [self.b]
 
 class Layer:
     def __init__(self, n_inputs, n_neurons, act_fn=None):
         self.n_inputs = n_inputs
-        self.act_fn = act_fn if act_fn else Identity()
-        self.neurons = [Neuron(n_inputs) for i in range(n_neurons)]
-        self.act_out = []
+        self.neurons = [Neuron(n_inputs, act_fn) for i in range(n_neurons)]
 
     def forward(self, X):
-        neuron_out = [neuron.forward(X) for neuron in self.neurons]
-        if self.act_fn:
-            self.act_out = self.act_fn.forward(neuron_out)
-            return self.act_out
-        return neuron_out
+        return [neuron.forward(X) for neuron in self.neurons]
 
     def backward(self):
-        if self.act_fn:
-            self.act_fn.backward()
         for neuron in self.neurons:
             neuron.backward()
 
     def parameters(self):
         return [param for neuron in self.neurons 
-                for param in neuron.parameters()]+self.act_out
+                for param in neuron.parameters()]
 
 
 class Model:
@@ -75,10 +69,14 @@ class Model:
     def parameters(self):
         return [param for layer in self.layers for param in layer.parameters()]
     
-    def zero_grad(self):
+    def zero_grad(self, batch=False):
         for param in self.parameters():
-            param.grad = 0.0
-
+            if batch:
+                if param.op not in ['w', 'b']:
+                    param.grad = 0.0
+            else:    
+                param.grad = 0.0
+                
 
 ########################## Loss Functions ##############################
 
@@ -94,43 +92,42 @@ class RMSLoss:
     
     def backward(self):
         for y_pred, y_diff in zip(self.Y_pred, self.Y_diff):
-            y_pred.grad += 2 * y_diff / (self.loss * len(self.Y_pred))
+            y_pred.grad = 2 * y_diff / (self.loss * len(self.Y_pred))
     
     
 class SoftmaxCrossEntropyLoss:
+    def _apply_softmax(self, Y_pred):
+        exp_vals = [math.exp(val.data) for val in Y_pred]
+        exp_sum = sum(exp_vals)
+        return [exp_val / exp_sum for exp_val in exp_vals]
+    
     def forward(self, Y_pred, Y_gt):
         assert len(Y_pred) == len(Y_gt), "Size mismatch"
         self.Y_pred = Y_pred
         self.Y_gt = Y_gt
-
-        # Apply softmax
-        exp_vals = [math.exp(val.data) for val in Y_pred]
-        exp_sum = sum(exp_vals)
-        self.softmax_data = [exp_val / exp_sum for exp_val in exp_vals]
+        self.softmax_data = self._apply_softmax(Y_pred)
 
         # Compute cross-entropy loss
-        loss = -sum(y_gt.data * math.log(y_softmax) 
-                    for y_gt, y_softmax in zip(Y_gt, self.softmax_data))
+        loss = -sum(y_gt.data * math.log(y_sm) 
+                    for y_gt, y_sm in zip(Y_gt, self.softmax_data))
         
-        return Value(loss, children=Y_pred+Y_gt, op='softmax_cce_loss')
+        return Value(loss, children=Y_pred+Y_gt, op='softmax_cce_loss', grad=1.0)
 
     def backward(self):
         for y_pred, y_softmax, y_gt in zip(self.Y_pred, self.softmax_data, self.Y_gt):
-            y_pred.grad += y_softmax - y_gt.data
+            y_pred.grad = y_softmax - y_gt.data
             
             
 ######################### Activation Functions #########################
 
 
 class BaseActivation:
-    def forward(self, neuron_outs):
-        self.outs = [Value(self._activation(val.data), children=[val], op=self.op) 
-                     for val in neuron_outs]
-        return self.outs
+    def forward(self, output):
+        self.out = Value(self._activation(output.data), children=[output], op=self.op) 
+        return self.out
 
     def backward(self):
-        for out in self.outs:
-            out.children[0].grad += out.grad * self._derivative(out.data)
+        self.out.children[0].grad = self.out.grad * self._derivative(self.out.data)
 
 
 class Identity(BaseActivation):
@@ -165,3 +162,21 @@ class SGD:
         for val in vals:
             val.momentum = m * val.momentum + lr * val.grad
             val.data -= val.momentum
+
+
+class Adam:
+    def __init__(self, lr=0.001, beta1=0.9, beta2=0.999, eps=1e-8, t=0):
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+        self.t = t
+
+    def step(self, vals, lr=0):
+        self.t += 1
+        for val in vals:
+            val.momentum = self.beta1 * val.momentum + (1 - self.beta1) * val.grad
+            val.velocity = self.beta2 * val.velocity + (1 - self.beta2) * val.grad ** 2
+            m_hat = val.momentum / (1 - self.beta1 ** self.t)
+            v_hat = val.velocity / (1 - self.beta2 ** self.t)
+            val.data -= self.lr * m_hat / ((v_hat ** 0.5) + self.eps)

@@ -22,7 +22,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
             y_batch = [y_all[idx] for idx in batch_indices]
 
             # Zero out the gradients from the previous batch
-            model.zero_grad()
+            model.zero_grad(batch=False)
 
             # Perform forward and backward pass for each data point in batch
             for X, y in zip(X_batch, y_batch):
@@ -42,6 +42,8 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
 
                 loss_fc.backward()
                 model.backward()
+                
+                # model.zero_grad(batch=True)
 
             # Average and clip the gradients
             for param in model.parameters():

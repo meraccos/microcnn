@@ -6,14 +6,15 @@ test_images, test_labels = mnist_data_retriever(9000, 10000, train_bool=False)
 
 model = nn.Model(
     [
-        nn.Layer(n_inputs=784, n_neurons=16, act_fn=nn.Tanh()),
-        nn.Layer(n_inputs=16, n_neurons=16, act_fn=nn.Tanh()),
-        nn.Layer(n_inputs=16, n_neurons=10, act_fn=None),
+        nn.Layer(n_inputs=784, n_neurons=16, act_fn=nn.Tanh),
+        nn.Layer(n_inputs=16, n_neurons=16, act_fn=nn.Tanh),
+        nn.Layer(n_inputs=16, n_neurons=10, act_fn=nn.Identity),
     ]
 )
 
 loss_fc = nn.SoftmaxCrossEntropyLoss()
-optimizer = nn.SGD()
+# optimizer = nn.SGD()
+optimizer = nn.Adam()
 
 for epoch in range(50):
     test(model, test_images, test_labels)
@@ -23,3 +24,4 @@ for epoch in range(50):
         n_epochs=1, 
         batch_size = 5, 
         loss_fc=loss_fc, optimizer=optimizer)
+    print()
