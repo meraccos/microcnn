@@ -43,7 +43,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
                 loss_fc.backward()
                 model.backward()
                 
-                # model.zero_grad(batch=True)
+                model.zero_grad(batch=True)
 
             # Average and clip the gradients
             for param in model.parameters():
@@ -56,7 +56,7 @@ def train(model, X_all, y_all, n_epochs, batch_size, loss_fc, optimizer, grad_cl
         avg_loss = epoch_loss / n_samples
         accuracy = correct / n_samples
         print(
-            f"Epoch {epoch+1}/{n_epochs}, Average Loss: {avg_loss:.3f}, Accuracy: {accuracy*100:.2f}%"
+            f"Epoch {epoch+1}/{n_epochs}, Average Loss: {avg_loss:.3f}, Accuracy: {accuracy*100:.2f}%\n"
         )
 
     return model, loss
@@ -96,7 +96,7 @@ def mnist_data_retriever(data_idx_start, data_idx_end, train_bool):
     labels_base10 = [[Value(1.0, op='in') if i == label else Value(0.0, op='in') 
                     for i in range(10)] for label in labels]
 
-    images_scaled = [[Value(pixel / 255.0, op='in') 
+    images_scaled = [[Value(pixel * 2 / 255.0 - 1.0, op='in') 
                         for pixel in image] for image in images]
     
     return images_scaled, labels_base10

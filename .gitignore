@@ -1,4 +1,4 @@
 *.pyc
 *.gz
-*.ipynb
+test.ipynb
 data/*

@@ -30,10 +30,8 @@ class Neuron:
         self.b.grad += self.z.grad  
 
     def parameters(self):
-        return self.w + [self.b, self.z, self.act_out]
+        return self.w + [self.b, self.act_out]
     
-    # def parameters(self):
-    #     return self.w + [self.b]
 
 class Layer:
     def __init__(self, n_inputs, n_neurons, act_fn=None):
@@ -162,7 +160,8 @@ class SGD:
         self.lr = lr
         self.m = m
     def step(self, vals):
-        for val in vals:
+        wb_vals = [val for val in vals if val.op in ['w', 'b']]
+        for val in wb_vals:
             val.momentum = self.m * val.momentum + self.lr * val.grad
             val.data -= val.momentum
 
@@ -177,7 +176,8 @@ class Adam:
 
     def step(self, vals):
         self.t += 1
-        for val in vals:
+        wb_vals = [val for val in vals if val.op in ['w', 'b']]
+        for val in wb_vals:
             val.momentum = self.beta1 * val.momentum + (1 - self.beta1) * val.grad
             val.velocity = self.beta2 * val.velocity + (1 - self.beta2) * val.grad ** 2
             m_hat = val.momentum / (1 - self.beta1 ** self.t)
