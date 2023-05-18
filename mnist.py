@@ -2,10 +2,6 @@ from utils import train, test, mnist_data_retriever
 from microcnn import nn
 import pickle
 
-# train_images, train_labels = mnist_data_retriever(0, 6000, train_bool=True)
-# test_images, test_labels = mnist_data_retriever(6000, 10000, train_bool=False)
-
-
 train_images, train_labels = mnist_data_retriever('fashion', 0, 6000, train_bool=True)
 test_images, test_labels = mnist_data_retriever('fashion', 6000, 9900, train_bool=False)
 
